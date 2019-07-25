@@ -82,7 +82,7 @@ void publishPointCloud(Mat& img_left, Mat& dmap) {
   pcl_pub.publish(out_cloud_ros);
 }
 
-Mat generateDisparityMap(Mat& left, Mat& right) {
+Mat generateDisparityMapELAS(Mat& left, Mat& right) {
   if (left.empty() || right.empty()) 
     return left;
   const Size imsize = left.size();
@@ -113,7 +113,7 @@ void imgCallback(const sensor_msgs::ImageConstPtr& msg_left, const sensor_msgs::
   remap(tmpL, img_left, lmapx, lmapy, cv::INTER_LINEAR);
   remap(tmpR, img_right, rmapx, rmapy, cv::INTER_LINEAR);
 
-  Mat dmap = generateDisparityMap(img_left, img_right);
+  Mat dmap = generateDisparityMapELAS(img_left, img_right);
   publishPointCloud(tmpL_color, dmap);
   
   imshow("LEFT", tmpL_color);

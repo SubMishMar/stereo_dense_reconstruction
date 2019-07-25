@@ -2,8 +2,8 @@
 <launch>
 
     <!--<param name ="/use_sim_time" value="true"/>-->
-    <param name="left_img_topic" type="string" value="/cam02/image_raw"/>
-    <param name="right_img_topic" type="string" value="/cam03/image_raw"/>
+    <param name="left_img_topic" type="string" value="/cam00/image_raw"/>
+    <param name="right_img_topic" type="string" value="/cam01/image_raw"/>
     <param name="calib_width" type="int" value="1392"/>
     <param name="calib_height" type="int" value="512"/>
     <param name="calib_file_name" type="string" value="/home/usl/catkin_ws/src/stereo_dense_reconstruction/calibration/kitti_2011_09_26.yml"/>

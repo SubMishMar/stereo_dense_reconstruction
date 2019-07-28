@@ -7,7 +7,7 @@
     <param name="calib_width" type="int" value="1392"/>
     <param name="calib_height" type="int" value="512"/>
 
-    <param name="calib_file_name" type="string" value="/home/usl/catkin_ws/src/stereo_dense_reconstruction/calibration/kitti_2011_09_26.yml"/>
+    <param name="calib_file_name" type="string" value="/home/usl/catkin_ws/src/stereo_dense_reconstruction/calibration/kitti_0027.yml"/>
     <node  pkg="stereo_dense_reconstruction"
            name="stereo_dense_reconstruction"
            type="dense_reconstruction"

@@ -11,6 +11,14 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/ChannelFloat32.h>
 #include <geometry_msgs/Point32.h>
+
+#include "opencv2/calib3d.hpp"
+#include "opencv2/imgproc.hpp"
+#include "opencv2/imgcodecs.hpp"
+#include "opencv2/highgui.hpp"
+#include "opencv2/core/utility.hpp"
+#include "opencv2/ximgproc.hpp"
+
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <dynamic_reconfigure/server.h>
@@ -33,6 +41,14 @@ Size calib_img_size;
 
 image_transport::Publisher dmap_pub;
 ros::Publisher pcl_pub;
+
+std_msgs::Header header;
+
+bool useSGBM;
+
+// SGBM params
+int max_disp;
+int wsize;
 
 void publishPointCloud(Mat& img_left, Mat& dmap) {
   pcl::PointCloud<pcl::PointXYZRGB> out_cloud_pcl;
@@ -77,7 +93,7 @@ void publishPointCloud(Mat& img_left, Mat& dmap) {
   }
   sensor_msgs::PointCloud2 out_cloud_ros;
   pcl::toROSMsg(out_cloud_pcl, out_cloud_ros);
-  out_cloud_ros.header.frame_id = "left_camera";
+  out_cloud_ros.header.frame_id = header.frame_id;
   out_cloud_ros.header.stamp = ros::Time::now();
   pcl_pub.publish(out_cloud_ros);
 }
@@ -99,10 +115,26 @@ Mat generateDisparityMapELAS(Mat& left, Mat& right) {
   return dmap;
 }
 
+Mat generateDisparityMapSGBM(Mat& left, Mat& right) {
+    max_disp = 256;
+    wsize = 3;
+    cv::Ptr<cv::StereoSGBM> left_matcher = cv::StereoSGBM::create(0, max_disp, wsize);
+    left_matcher->setP1(24*wsize*wsize);
+    left_matcher->setP2(96*wsize*wsize);
+    left_matcher->setPreFilterCap(63);
+    left_matcher->setMode(cv::StereoSGBM::MODE_SGBM_3WAY);
+    cv::Mat left_disp;
+    left_matcher->compute(left, right, left_disp);
+    if(left_disp.empty()) {
+        ROS_ERROR("Empty left disparity map");
+    }
+    return left_disp;
+}
+
 void imgCallback(const sensor_msgs::ImageConstPtr& msg_left, const sensor_msgs::ImageConstPtr& msg_right) {
   Mat tmpL_color = cv_bridge::toCvShare(msg_left, sensor_msgs::image_encodings::BGR8)->image;
   Mat tmpR_color = cv_bridge::toCvShare(msg_right, sensor_msgs::image_encodings::BGR8)->image;
-
+  header.frame_id = msg_left->header.frame_id;
   if (tmpL_color.empty() || tmpR_color.empty())
     return;
 
@@ -113,7 +145,8 @@ void imgCallback(const sensor_msgs::ImageConstPtr& msg_left, const sensor_msgs::
   remap(tmpL, img_left, lmapx, lmapy, cv::INTER_LINEAR);
   remap(tmpR, img_right, rmapx, rmapy, cv::INTER_LINEAR);
 
-  Mat dmap = generateDisparityMapELAS(img_left, img_right);
+//  Mat dmap = generateDisparityMapELAS(img_left, img_right);
+  Mat dmap = generateDisparityMapSGBM(img_left, img_right);
   publishPointCloud(tmpL_color, dmap);
   
   imshow("LEFT", tmpL_color);
@@ -127,8 +160,10 @@ void findRectificationMap() {
   cout << "Starting rectification" << endl;
   stereoRectify(K1, D1, K2, D2, calib_img_size, R, Mat(T), R1, R2, P1, P2, Q, 
                 CALIB_ZERO_DISPARITY, 0, calib_img_size, &validRoi[0], &validRoi[1]);
+  ROS_INFO_STREAM("P1" << P1);
+  ROS_INFO_STREAM("P2" << P2);
+  ROS_INFO_STREAM("Q" << Q);
   cv::initUndistortRectifyMap(K1, D1, R1, P1, calib_img_size, CV_32F, lmapx, lmapy);
-
   cv::initUndistortRectifyMap(K2, D2, R2, P2, calib_img_size, CV_32F, rmapx, rmapy);
 
   cout << "Done rectification" << endl;
@@ -179,7 +214,7 @@ int main(int argc, char** argv) {
   calib_file["XT"] >> XT;
 
   findRectificationMap();
-  
+
   message_filters::Subscriber<sensor_msgs::Image> sub_img_left(nh, left_img_topic, 100);
   message_filters::Subscriber<sensor_msgs::Image> sub_img_right(nh, right_img_topic, 100);
   

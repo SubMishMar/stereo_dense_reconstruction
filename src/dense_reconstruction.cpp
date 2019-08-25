@@ -99,23 +99,25 @@ void publishPointCloud(Mat& img_left, Mat& dmap) {
 }
 
 Mat generateDisparityMapELAS(Mat& left, Mat& right) {
-  if (left.empty() || right.empty()) 
-    return left;
-  const Size imsize = left.size();
-  const int32_t dims[3] = {imsize.width, imsize.height, imsize.width};
-  Mat leftdpf = Mat::zeros(imsize, CV_32F);
-  Mat rightdpf = Mat::zeros(imsize, CV_32F);
+    ROS_WARN_STREAM("Using ELAS");
+    if (left.empty() || right.empty())
+      return left;
+    const Size imsize = left.size();
+    const int32_t dims[3] = {imsize.width, imsize.height, imsize.width};
+    Mat leftdpf = Mat::zeros(imsize, CV_32F);
+    Mat rightdpf = Mat::zeros(imsize, CV_32F);
 
-  Elas::parameters param(Elas::MIDDLEBURY);
-  param.postprocess_only_left = true;
-  Elas elas(param);
-  elas.process(left.data, right.data, leftdpf.ptr<float>(0), rightdpf.ptr<float>(0), dims);
-  Mat dmap = Mat(out_img_size, CV_8UC1, Scalar(0));
-  leftdpf.convertTo(dmap, CV_8U, 1.);
-  return dmap;
+    Elas::parameters param(Elas::MIDDLEBURY);
+    param.postprocess_only_left = true;
+    Elas elas(param);
+    elas.process(left.data, right.data, leftdpf.ptr<float>(0), rightdpf.ptr<float>(0), dims);
+    Mat dmap = Mat(out_img_size, CV_8UC1, Scalar(0));
+    leftdpf.convertTo(dmap, CV_8U, 1.);
+    return dmap;
 }
 
 Mat generateDisparityMapSGBM(Mat& left, Mat& right) {
+    ROS_WARN_STREAM("Using SGBM");
     max_disp = 256;
     wsize = 3;
     cv::Ptr<cv::StereoSGBM> left_matcher = cv::StereoSGBM::create(0, max_disp, wsize);
@@ -145,8 +147,8 @@ void imgCallback(const sensor_msgs::ImageConstPtr& msg_left, const sensor_msgs::
   remap(tmpL, img_left, lmapx, lmapy, cv::INTER_LINEAR);
   remap(tmpR, img_right, rmapx, rmapy, cv::INTER_LINEAR);
 
-//  Mat dmap = generateDisparityMapELAS(img_left, img_right);
-  Mat dmap = generateDisparityMapSGBM(img_left, img_right);
+  Mat dmap = generateDisparityMapELAS(img_left, img_right);
+//  Mat dmap = generateDisparityMapSGBM(img_left, img_right);
   publishPointCloud(tmpL_color, dmap);
   
   imshow("LEFT", tmpL_color);
@@ -160,9 +162,9 @@ void findRectificationMap() {
   cout << "Starting rectification" << endl;
   stereoRectify(K1, D1, K2, D2, calib_img_size, R, Mat(T), R1, R2, P1, P2, Q, 
                 CALIB_ZERO_DISPARITY, 0, calib_img_size, &validRoi[0], &validRoi[1]);
-  ROS_INFO_STREAM("P1" << P1);
-  ROS_INFO_STREAM("P2" << P2);
-  ROS_INFO_STREAM("Q" << Q);
+  ROS_INFO_STREAM("P1: \n" << P1);
+  ROS_INFO_STREAM("P2: \n" << P2);
+  ROS_INFO_STREAM("Q: \n" << Q);
   cv::initUndistortRectifyMap(K1, D1, R1, P1, calib_img_size, CV_32F, lmapx, lmapy);
   cv::initUndistortRectifyMap(K2, D2, R2, P2, calib_img_size, CV_32F, rmapx, rmapy);
 
@@ -215,8 +217,8 @@ int main(int argc, char** argv) {
 
   findRectificationMap();
 
-  message_filters::Subscriber<sensor_msgs::Image> sub_img_left(nh, left_img_topic, 100);
-  message_filters::Subscriber<sensor_msgs::Image> sub_img_right(nh, right_img_topic, 100);
+  message_filters::Subscriber<sensor_msgs::Image> sub_img_left(nh, left_img_topic, 1);
+  message_filters::Subscriber<sensor_msgs::Image> sub_img_right(nh, right_img_topic, 1);
   
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> SyncPolicy;
   message_filters::Synchronizer<SyncPolicy> sync(SyncPolicy(10), sub_img_left, sub_img_right);
